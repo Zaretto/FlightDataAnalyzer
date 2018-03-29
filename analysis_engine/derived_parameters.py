@@ -4185,6 +4185,24 @@ class FlapAngle(DerivedParameterNode):
             self.array, self.frequency, self.offset = blend_two_parameters(*sources)
 
 
+class FlapSynchroAsymmetry(DerivedParameterNode):
+    '''
+    Flap Synchro Asymmetry angle.
+    
+    Shows an absolute value of difference between Left and Right Flap Synchros.
+    Note: this is not a difference in flap angle.
+    '''
+
+    units = ut.DEGREE
+
+    @classmethod
+    def can_operate(cls, available):
+        return all_of(('Flap Angle (L) Synchro', 'Flap Angle (R) Synchro',), available)
+    
+    def derive(self, synchro_l=P('Flap Angle (L) Synchro'), synchro_r=P('Flap Angle (R) Synchro'),):
+        self.array = np.abs(synchro_l.array - synchro_r.array)
+
+
 '''
 class SlatAngle(DerivedParameterNode):
 
