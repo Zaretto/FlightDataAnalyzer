@@ -13331,6 +13331,28 @@ class GearDownToLandingFlapConfigurationDuration(KeyPointValueNode):
             self.create_kpv(flap_idx, diff / self.frequency)
 
 
+class FlapSynchroAsymmetryMax(KeyPointValueNode):
+    '''
+    Maximum difference between Flap Left and Right Synchro Switches. 
+    Will trigger if the difference between Left and Right Synchros is 
+    above 7 degrees, or Flap Bypass Valve opens, as per Boeing's recommendation.
+    
+    NOTE: This is not a difference between L/R flap angles.
+    '''
+    
+    units = ut.DEGREE
+    
+    def derive(self, synchro=P('Flap Synchro Asymmetry'),
+                     valve=P('Flap Bypass Valve Position'),):
+
+        synchro_slices = slices_above(synchro.array, 7)
+        valve_slices = runs_of_ones(valve.array)
+        asymmetry_slices = slices_or(synchro_slices[1], valve_slices)
+        
+        self.create_kpvs_within_slices(synchro.array, asymmetry_slices, 
+                                       max_value, min_duration=1, freq=synchro.hz)
+
+
 ##############################################################################
 
 

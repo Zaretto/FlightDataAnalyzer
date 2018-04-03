@@ -411,6 +411,7 @@ from analysis_engine.key_point_values import (
     FlapOrConfigurationMaxOrMin,
     FlapWithGearUpMax,
     FlapWithSpeedbrakeDeployedMax,
+    FlapSynchroAsymmetryMax,
     FlareDistance20FtToTouchdown,
     FlareDuration20FtToTouchdown,
     FlightControlPreflightCheck,
@@ -15164,6 +15165,18 @@ class TestFlapAt500Ft(unittest.TestCase, NodeTest):
         self.assertEqual(node, KPV(name=name, items=[
             KeyPointValue(index=90, value=45, name=name),
         ]))
+
+
+class TestFlapSynchroAsymmetryMax(unittest.TestCase):
+    def test_derive(self):
+        synchro = P('Flap Synchro Asymmetry',   [0,0,1,4,5,6,6,6,9,8,3,0,0,0])
+        valve = P('Flap Bypass Valve Position', [0,0,1,1,1,0,0,0,0,0,0,0,0,0])
+        asym = FlapSynchroAsymmetryMax()
+        asym.get_derived((synchro, valve))
+        self.assertEqual(asym[0].index, 8)
+        self.assertEqual(asym[0].value, 9)
+        self.assertEqual(asym[1].index, 4)
+        self.assertEqual(asym[1].value, 5)
 
 
 class TestGearDownToLandingFlapConfigurationDuration(unittest.TestCase):

@@ -165,6 +165,7 @@ from analysis_engine.derived_parameters import (
     Eng_VibNpMax,
     FlapAngle,
     FlapManoeuvreSpeed,
+    FlapSynchroAsymmetry,
     MGBOilTemp,
     MGBOilPress,
     FuelQty,
@@ -5067,6 +5068,17 @@ class TestFlapAngle(unittest.TestCase, NodeTest):
         self.assertEqual(fa.frequency, 2)
         offset = (fl.offset + fr.offset)/2.0 -0.5
         self.assertEqual(fa.offset, offset)
+
+
+class TestFlapSynchroAsymmetry(unittest.TestCase):
+    # very simple test but it ensures we aren't getting negative 
+    # values as that would affect the FlapSynchroAsymmetryMax KPV
+    def test_basic(self):
+        synchro_l = P('Flap Angle (L) Synchro', [0,1,2,3,4,5,5,5,5,5,5,5,5])
+        synchro_r = P('Flap Angle (R) Synchro', [0,1,2,3,4,5,6,7,8,9,10,11,12])
+        asym = FlapSynchroAsymmetry()
+        asym.get_derived((synchro_l, synchro_r))
+        self.assertEqual(asym.array[8], 3)
 
 
 class TestHeadingTrueContinuous(unittest.TestCase):
