@@ -197,7 +197,7 @@ def _segment_type_and_slice(speed_array, speed_frequency,
     return segment_type, segment, array_start_secs
 
 
-def _get_normalised_split_params(hdf):
+def _get_normalised_split_params(hdf, align_param=None):
     '''
     Get split parameters (currently engine power and Groundspeed) from hdf,
     normalise them on a scale from 0-1.0 and return the minimum.
@@ -209,7 +209,7 @@ def _get_normalised_split_params(hdf):
     :rtype: (None, None) or (np.ma.masked_array, float)
     '''
     params = []
-    first_split_param = None
+
     split_params = (
         'Eng (1) N1', 'Eng (2) N1', 'Eng (3) N1', 'Eng (4) N1',
         'Eng (1) N2', 'Eng (2) N2', 'Eng (3) N2', 'Eng (4) N2',
@@ -222,15 +222,15 @@ def _get_normalised_split_params(hdf):
             param = hdf[param_name]
         except KeyError:
             continue
-        if first_split_param:
+        if align_param:
             # Align all other parameters to first available.  #Q: Why not force
             # to 1Hz?
-            param.array = align(param, first_split_param)
+            param.array = align(param, align_param)
         else:
-            first_split_param = param
+            align_param = param
         params.append(param)
 
-    if not first_split_param:
+    if not len(params):
         return None, None
     # If there is at least one split parameter available.
     # normalise the parameters we'll use for splitting the data
@@ -240,7 +240,7 @@ def _get_normalised_split_params(hdf):
     # Using a true minimum leads to bias to a zero value. We take the average
     # to allow each parameter equal weight, then (later) seek the minimum.
     split_params_min = np.ma.average(normalised_params, axis=0)
-    return split_params_min, first_split_param.frequency
+    return split_params_min, align_param.frequency
 
 
 def _get_eng_params(hdf, align_param=None):
@@ -298,8 +298,8 @@ def _rate_of_turn(heading):
     return rate_of_turn_masked
 
 
-def _split_on_eng_params(slice_start_secs, slice_stop_secs,
-                         split_params_min, split_params_frequency):
+def _split_on_eng_params(slice_start_secs, slice_stop_secs, split_params_min,
+                         split_params_frequency):
     '''
     Find split using engine parameters.
 
@@ -324,10 +324,16 @@ def _split_on_eng_params(slice_start_secs, slice_stop_secs,
     if split_index is None:
         return split_index, split_value
 
-    matching_indices = np.ma.where(
-        split_params_min[split_params_slice] == split_value)[0]
-    split_index = matching_indices[len(matching_indices) / 2] + slice_start
+    eng_min_slices = slices_remove_small_slices(
+        slices_remove_small_gaps(
+            runs_of_ones(split_params_min[split_params_slice] == split_value),
+            time_limit=60,
+            hz=split_params_frequency),
+        hz=split_params_frequency
+    )
 
+    split_index = eng_min_slices[0].start + \
+        ((eng_min_slices[0].stop - eng_min_slices[0].start) / 2) + slice_start
     split_index = round(split_index / split_params_frequency)
     return split_index, split_value
 
@@ -505,7 +511,11 @@ def split_segments(hdf, aircraft_info):
     rate_of_turn = _rate_of_turn(heading)
 
     split_params_min, split_params_frequency \
-        = _get_normalised_split_params(hdf)
+        = _get_normalised_split_params(hdf, heading)
+    if split_params_min is not None:
+        split_params_min = repair_mask(split_params_min,
+                                       frequency=split_params_frequency,
+                                       repair_duration=None)
 
     if hdf.reliable_frame_counter:
         dfc = hdf['Frame Counter']
@@ -561,7 +571,9 @@ def split_segments(hdf, aircraft_info):
         # Find split based on minimum of engine parameters.
         if split_params_min is not None:
             eng_split_index, eng_split_value = _split_on_eng_params(
-                slice_start_secs, slice_stop_secs, split_params_min,
+                slice_start_secs,
+                slice_stop_secs,
+                split_params_min,
                 split_params_frequency)
         else:
             eng_split_index, eng_split_value = None, None
@@ -639,7 +651,7 @@ def split_segments(hdf, aircraft_info):
 
     '''
     import matplotlib.pyplot as plt
-    for look in [speed_array, heading.array, dfc.array, eng_arrays]:
+    for look in [speed_array, heading.array, dfc.array, split_params_min]:
         plt.plot(np.linspace(0, speed_secs, len(look)), look/np.ptp(look))
     for seg in segments:
         plt.plot([seg[1].start, seg[1].stop], [-0.5,+1])
