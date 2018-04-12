@@ -393,8 +393,8 @@ class TestSplitSegments(unittest.TestCase):
 
         segment_tuples = split_segments(hdf, {})
         self.assertEqual(segment_tuples,
-                         [('START_AND_STOP', slice(0, 9953.0, None), 0),
-                          ('START_AND_STOP', slice(9953.0, 21799.0, None), 1),
+                         [('START_AND_STOP', slice(0, 9952.0, None), 0),
+                          ('START_AND_STOP', slice(9952.0, 21799.0, None), 0),
                           ('START_AND_STOP', slice(21799.0, 24665.0, None), 3),
                           ('START_AND_STOP', slice(24665.0, 27898.0, None), 1),
                           ('START_AND_STOP', slice(27898.0, 31424.0, None), 2)])
@@ -489,6 +489,30 @@ class TestSplitSegments(unittest.TestCase):
                           'START_AND_STOP',
                           'START_AND_STOP',
                           'START_ONLY'))
+
+
+    @unittest.skipIf(not os.path.isfile(os.path.join(
+        test_data_path, "rto_split_segment.hdf5")), "Test file not present")
+    def test_rto_correct_side_of_split(self):
+        '''
+        Test to ensure that RTO's are on the correct side of splitting, i.e. at
+        the beginning of a flight. This example HDF5 file appears to have two
+        stationary engine activities and an RTO between the two flights.
+        This creates 6 sizeable slices (potential splitting points) where the
+        engine parameters normalised to 0.
+        We're interested in making the segment split within the first of these
+        eng_min_slices slices (Between indices 11959.5 to 12336.5).
+        Ideally the segment split should be halfway between this, at 12148.0.
+        '''
+        hdf = hdf_file(os.path.join(test_data_path, "rto_split_segment.hdf5"))
+        segment_tuples = split_segments(hdf, {})
+        split_idx = 12148.0
+        self.assertEqual(
+            segment_tuples,
+            [('START_AND_STOP', slice(0, split_idx, None), 0),
+             ('START_AND_STOP', slice(split_idx, 22784.0, None), 52)]
+        )
+
 
     def test__get_normalised_split_params(self):
         hdf = mock.Mock()
